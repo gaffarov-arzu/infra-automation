@@ -3,11 +3,11 @@ provider "aws" {
 }
 
 resource "aws_instance" "example" {
-  ami           = "ami-0c55b159cbfafe1f0"  # AWS test AMI
-  instance_type = "t2.micro"
+  ami           = "ami-0c55b159cbfafe1f0"
+  instance_type = var.instance_type
 }
 
 resource "aws_s3_bucket" "example_bucket" {
-  bucket = "my-portfolio-bucket-12345"  # benzersiz bir isim
+  bucket = "my-portfolio-bucket-12345"
   acl    = "private"
 }
