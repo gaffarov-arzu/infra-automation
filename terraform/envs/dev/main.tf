@@ -52,29 +52,37 @@ resource "aws_security_group" "app_sg" {
 }
 
 ##############################
-# IAM ROLE
+# EXISTING IAM ROLE
 ##############################
-resource "aws_iam_role" "dev_role" {
-  name = "dev-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action    = "sts:AssumeRole"
-      Effect    = "Allow"
-      Principal = { Service = "ec2.amazonaws.com" }
-    }]
-  })
+data "aws_iam_role" "existing_dev_role" {
+  name = "dev-role"  # AWS'de zaten var olan rolün adı
+}
+
+data "aws_iam_instance_profile" "existing_profile" {
+  name = "dev-role"  # Bu rolün bağlı olduğu instance profile adı
 }
 
 ##############################
 # EC2 INSTANCE
 ##############################
+# Güncel Amazon Linux 2 AMI
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+  }
+}
+
 resource "aws_instance" "app_instance" {
-  ami           = "ami-0dba2cb6798deb6d8"  # us-west-2 Amazon Linux 2
-  instance_type = "t2.micro"
-  subnet_id     = aws_subnet.public_subnet.id
-  vpc_security_group_ids = [aws_security_group.app_sg.id]
-  key_name      = "my-key"  # kendi keypair
+  ami                    = data.aws_ami.amazon_linux.id
+  instance_type           = "t2.micro"
+  subnet_id               = aws_subnet.public_subnet.id
+  vpc_security_group_ids  = [aws_security_group.app_sg.id]
+  iam_instance_profile    = data.aws_iam_instance_profile.existing_profile.name
+  key_name                = "my-key"  # kendi keypair
 
   tags = { Name = "dev-instance" }
 }
@@ -95,7 +103,7 @@ output "security_group_id" {
 }
 
 output "iam_role_arn" {
-  value = aws_iam_role.dev_role.arn
+  value = data.aws_iam_role.existing_dev_role.arn
 }
 
 output "instance_id" {
