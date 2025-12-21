@@ -19,4 +19,5 @@ output "security_group_id" {
 }
 
 output "iam_role_arn" {
-
+  value = module.iam.role_arn
+}
