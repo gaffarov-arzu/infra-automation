@@ -10,18 +10,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-      - run: pip install ansible
-      - name: Write private key
+
+      # Private key’i secrets’tan alıp key.pem olarak kaydet
+      - name: Setup SSH key
         run: |
-          echo "${{ secrets.EC2_SSH_KEY }}" > ansible/key.pem
-          chmod 600 ansible/key.pem
-      - name: Create inventory
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/key.pem
+          chmod 600 ~/.ssh/key.pem
+
+      # Host key checking devre dışı bırak
+      - name: Disable SSH host key checking
+        run: |
+          echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+
+      # Inventory dosyası
+      - name: Write hosts.ini
         run: |
           echo "[web]" > ansible/hosts.ini
-          echo "ec2-instance ansible_host=<EC2_PUBLIC_IP> ansible_user=ec2-user ansible_ssh_private_key_file=ansible/key.pem" >> ansible/hosts.ini
-      - name: Run Ansible
-        run: ansible-playbook -i ansible/playbooks/hosts.ini ansible/playbooks/nginx.yml
+          echo "ec2-instance ansible_host=44.246.207.109 ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/key.pem" >> ansible/hosts.ini
+
+      # Ansible playbook çalıştır
+      - name: Run Nginx playbook
+        run: ansible-playbook -i ansible/hosts.ini ansible/playbooks/nginx.yml
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
