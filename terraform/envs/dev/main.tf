@@ -52,49 +52,18 @@ data "aws_subnet" "used_subnet" {
 }
 
 ##############################
-# SECURITY GROUP (varsa kullan / yoksa oluştur)
+# SECURITY GROUP (mevcut olanı kullan)
 ##############################
-data "aws_security_groups" "existing_sg" {
+data "aws_security_group" "used_sg" {
+  filter {
+    name   = "group-name"
+    values = ["dev-sg"]
+  }
+
   filter {
     name   = "vpc-id"
     values = [data.aws_vpc.used_vpc.id]
   }
-}
-
-locals {
-  sg_exists = length([for sg in data.aws_security_groups.existing_sg.ids : sg if sg == "dev-sg"]) > 0
-}
-
-resource "aws_security_group" "app_sg" {
-  count       = local.sg_exists ? 0 : 1
-  name        = "dev-sg"
-  description = "Allow SSH and HTTP"
-  vpc_id      = data.aws_vpc.used_vpc.id
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-data "aws_security_group" "used_sg" {
-  id = local.sg_exists ? data.aws_security_groups.existing_sg.ids[0] : aws_security_group.app_sg[0].id
 }
 
 ##############################
