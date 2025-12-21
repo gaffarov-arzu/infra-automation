@@ -3,7 +3,7 @@ name: Terraform Dev Apply
 on:
   push:
     branches:
-      - main  # Ana branch push’unda tetiklenecek
+      - main  # main branch push’unda tetiklenecek
 
 jobs:
   terraform:
@@ -22,16 +22,19 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: terraform -chdir=terraform/envs/dev init -reconfigure
+          AWS_DEFAULT_REGION: us-west-2
+        run: terraform -chdir=terraform/envs/dev init
 
       - name: Terraform Plan
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-west-2
         run: terraform -chdir=terraform/envs/dev plan
 
       - name: Terraform Apply
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-west-2
         run: terraform -chdir=terraform/envs/dev apply -auto-approve
