@@ -6,85 +6,46 @@ provider "aws" {
 }
 
 ##############################
-# VPC
+# EXISTING VPC
 ##############################
-resource "aws_vpc" "main_vpc" {
-  cidr_block           = "10.0.0.0/16"
-  enable_dns_support   = true
-  enable_dns_hostnames = true
-  tags = { Name = "dev-vpc" }
+data "aws_vpcs" "existing" {}
+
+locals {
+  existing_vpc = length(data.aws_vpcs.existing.ids) > 0 ? data.aws_vpcs.existing.ids[0] : null
+}
+
+data "aws_vpc" "used_vpc" {
+  id = local.existing_vpc
 }
 
 ##############################
-# INTERNET GATEWAY
+# EXISTING SUBNET
 ##############################
-resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.main_vpc.id
-  tags   = { Name = "dev-igw" }
+data "aws_subnets" "existing_subnets" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.used_vpc.id]
+  }
+}
+
+# Sadece ilk subneti kullan
+data "aws_subnet" "used_subnet" {
+  id = data.aws_subnets.existing_subnets.ids[0]
 }
 
 ##############################
-# PUBLIC SUBNET
+# EXISTING SECURITY GROUP
 ##############################
-resource "aws_subnet" "public_subnet" {
-  vpc_id                  = aws_vpc.main_vpc.id
-  cidr_block              = "10.0.1.0/24"
-  map_public_ip_on_launch = true
-  availability_zone       = "us-west-2a"
-  tags = { Name = "dev-public-subnet" }
-}
-
-##############################
-# ROUTE TABLE
-##############################
-resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main_vpc.id
-  tags   = { Name = "dev-public-rt" }
-}
-
-resource "aws_route" "default_internet" {
-  route_table_id         = aws_route_table.public.id
-  destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.igw.id
-}
-
-resource "aws_route_table_association" "public_subnet_assoc" {
-  subnet_id      = aws_subnet.public_subnet.id
-  route_table_id = aws_route_table.public.id
-}
-
-##############################
-# SECURITY GROUP
-##############################
-resource "aws_security_group" "dev_sg" {
-  name        = "dev-sg"
-  description = "Allow SSH and HTTP"
-  vpc_id      = aws_vpc.main_vpc.id
-
-  ingress {
-    description = "SSH"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+data "aws_security_group" "used_sg" {
+  filter {
+    name   = "group-name"
+    values = ["dev-sg"]
   }
 
-  ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.used_vpc.id]
   }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = { Name = "dev-sg" }
 }
 
 ##############################
@@ -114,9 +75,10 @@ data "aws_ami" "amazon_linux" {
 resource "aws_instance" "app_instance" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type           = "t2.micro"
-  subnet_id               = aws_subnet.public_subnet.id
-  vpc_security_group_ids  = [aws_security_group.dev_sg.id]
+  subnet_id               = data.aws_subnet.used_subnet.id
+  vpc_security_group_ids  = [data.aws_security_group.used_sg.id]
   key_name                = local.key_to_use
+  associate_public_ip_address = true
 
   tags = { Name = "dev-instance" }
 }
@@ -125,15 +87,15 @@ resource "aws_instance" "app_instance" {
 # OUTPUTS
 ##############################
 output "vpc_id" {
-  value = aws_vpc.main_vpc.id
+  value = data.aws_vpc.used_vpc.id
 }
 
 output "subnet_id" {
-  value = aws_subnet.public_subnet.id
+  value = data.aws_subnet.used_subnet.id
 }
 
 output "security_group_id" {
-  value = aws_security_group.dev_sg.id
+  value = data.aws_security_group.used_sg.id
 }
 
 output "instance_id" {
