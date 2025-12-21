@@ -1,25 +1,11 @@
+terraform {
+  backend "local" {
+    path = "terraform.tfstate"
+  }
+}
+
 provider "aws" {
   region = "us-west-2"
-}
-
-# ------------------------------
-# S3 Backend Bucket
-# ------------------------------
-resource "aws_s3_bucket" "tf_state" {
-  bucket = "my-terraform-state-bucket"
-  acl    = "private"
-
-  tags = {
-    Name = "TerraformStateBucket"
-    Env  = "dev"
-  }
-}
-
-resource "aws_s3_bucket_versioning" "tf_state_versioning" {
-  bucket = aws_s3_bucket.tf_state.id
-  versioning_configuration {
-    status = "Enabled"
-  }
 }
 
 # ------------------------------
@@ -71,17 +57,17 @@ resource "aws_security_group" "app_sg" {
 # EC2 Instance
 # ------------------------------
 resource "aws_instance" "app_instance" {
-  ami           = "ami-0c55b159cbfafe1f0" # Örnek Amazon Linux
+  ami           = "ami-0c55b159cbfafe1f0"
   instance_type = "t2.micro"
   subnet_id     = aws_subnet.public_subnet.id
-  key_name      = "my-key" # kendi key pair
+  key_name      = "my-key"  # kendi key pair
   vpc_security_group_ids = [aws_security_group.app_sg.id]
 
   tags = { Name = "dev-instance" }
 }
 
 # ------------------------------
-# IAM Role (basit)
+# IAM Role
 # ------------------------------
 resource "aws_iam_role" "dev_role" {
   name = "dev-role"
@@ -95,7 +81,9 @@ resource "aws_iam_role" "dev_role" {
   })
 }
 
+# ------------------------------
 # Outputs
+# ------------------------------
 output "vpc_id" {
   value = aws_vpc.main_vpc.id
 }
@@ -114,8 +102,4 @@ output "instance_id" {
 
 output "iam_role_arn" {
   value = aws_iam_role.dev_role.arn
-}
-
-output "s3_bucket_id" {
-  value = aws_s3_bucket.tf_state.id
 }
