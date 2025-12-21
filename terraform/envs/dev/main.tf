@@ -1,31 +1,29 @@
-terraform {
-  backend "local" {
-    path = "terraform.tfstate"
-  }
-}
-
+##############################
+# PROVIDER
+##############################
 provider "aws" {
   region = "us-west-2"
 }
 
-# ------------------------------
-# VPC & Network
-# ------------------------------
+##############################
+# VPC & NETWORK
+##############################
 resource "aws_vpc" "main_vpc" {
   cidr_block = "10.0.0.0/16"
   tags = { Name = "dev-vpc" }
 }
 
 resource "aws_subnet" "public_subnet" {
-  vpc_id            = aws_vpc.main_vpc.id
-  cidr_block        = "10.0.1.0/24"
-  availability_zone = "us-west-2a"
+  vpc_id                  = aws_vpc.main_vpc.id
+  cidr_block              = "10.0.1.0/24"
+  map_public_ip_on_launch = true
+  availability_zone       = "us-west-2a"
   tags = { Name = "dev-public-subnet" }
 }
 
-# ------------------------------
-# Security Group
-# ------------------------------
+##############################
+# SECURITY GROUP
+##############################
 resource "aws_security_group" "app_sg" {
   name        = "dev-sg"
   description = "Allow SSH and HTTP"
@@ -53,22 +51,9 @@ resource "aws_security_group" "app_sg" {
   }
 }
 
-# ------------------------------
-# EC2 Instance
-# ------------------------------
-resource "aws_instance" "app_instance" {
-  ami           = "ami-0c55b159cbfafe1f0"
-  instance_type = "t2.micro"
-  subnet_id     = aws_subnet.public_subnet.id
-  key_name      = "my-key"  # kendi key pair
-  vpc_security_group_ids = [aws_security_group.app_sg.id]
-
-  tags = { Name = "dev-instance" }
-}
-
-# ------------------------------
-# IAM Role
-# ------------------------------
+##############################
+# IAM ROLE
+##############################
 resource "aws_iam_role" "dev_role" {
   name = "dev-role"
   assume_role_policy = jsonencode({
@@ -81,9 +66,22 @@ resource "aws_iam_role" "dev_role" {
   })
 }
 
-# ------------------------------
-# Outputs
-# ------------------------------
+##############################
+# EC2 INSTANCE
+##############################
+resource "aws_instance" "app_instance" {
+  ami           = "ami-0dba2cb6798deb6d8"  # us-west-2 Amazon Linux 2
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.public_subnet.id
+  vpc_security_group_ids = [aws_security_group.app_sg.id]
+  key_name      = "my-key"  # kendi keypair
+
+  tags = { Name = "dev-instance" }
+}
+
+##############################
+# OUTPUTS
+##############################
 output "vpc_id" {
   value = aws_vpc.main_vpc.id
 }
@@ -96,10 +94,10 @@ output "security_group_id" {
   value = aws_security_group.app_sg.id
 }
 
-output "instance_id" {
-  value = aws_instance.app_instance.id
-}
-
 output "iam_role_arn" {
   value = aws_iam_role.dev_role.arn
+}
+
+output "instance_id" {
+  value = aws_instance.app_instance.id
 }
