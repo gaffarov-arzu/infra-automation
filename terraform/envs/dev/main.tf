@@ -25,9 +25,21 @@ data "aws_vpc" "used_vpc" {
 }
 
 ##############################
-# SUBNET
+# SUBNET (varsa kullan / yoksa oluştur)
 ##############################
+data "aws_subnets" "existing_subnets" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.used_vpc.id]
+  }
+}
+
+locals {
+  subnet_exists = length(data.aws_subnets.existing_subnets.ids) > 0 ? true : false
+}
+
 resource "aws_subnet" "public_subnet" {
+  count                   = local.subnet_exists ? 0 : 1
   vpc_id                  = data.aws_vpc.used_vpc.id
   cidr_block              = "10.0.1.0/24"
   map_public_ip_on_launch = true
@@ -35,10 +47,26 @@ resource "aws_subnet" "public_subnet" {
   tags = { Name = "dev-public-subnet" }
 }
 
+data "aws_subnet" "used_subnet" {
+  id = local.subnet_exists ? data.aws_subnets.existing_subnets.ids[0] : aws_subnet.public_subnet[0].id
+}
+
 ##############################
-# SECURITY GROUP
+# SECURITY GROUP (varsa kullan / yoksa oluştur)
 ##############################
+data "aws_security_groups" "existing_sg" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.used_vpc.id]
+  }
+}
+
+locals {
+  sg_exists = length([for sg in data.aws_security_groups.existing_sg.ids : sg if sg == "dev-sg"]) > 0
+}
+
 resource "aws_security_group" "app_sg" {
+  count       = local.sg_exists ? 0 : 1
   name        = "dev-sg"
   description = "Allow SSH and HTTP"
   vpc_id      = data.aws_vpc.used_vpc.id
@@ -65,6 +93,10 @@ resource "aws_security_group" "app_sg" {
   }
 }
 
+data "aws_security_group" "used_sg" {
+  id = local.sg_exists ? data.aws_security_groups.existing_sg.ids[0] : aws_security_group.app_sg[0].id
+}
+
 ##############################
 # EXISTING IAM ROLE
 ##############################
@@ -84,7 +116,6 @@ data "aws_iam_instance_profile" "existing_profile" {
 ##############################
 data "aws_key_pair" "existing_key" {
   key_name = "my-key"
-  # Eğer yoksa bu data hata verir, aşağıdaki create ile telafi edilecek
 }
 
 resource "aws_key_pair" "my_key" {
@@ -113,8 +144,8 @@ data "aws_ami" "amazon_linux" {
 resource "aws_instance" "app_instance" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type           = "t2.micro"
-  subnet_id               = aws_subnet.public_subnet.id
-  vpc_security_group_ids  = [aws_security_group.app_sg.id]
+  subnet_id               = data.aws_subnet.used_subnet.id
+  vpc_security_group_ids  = [data.aws_security_group.used_sg.id]
   iam_instance_profile    = data.aws_iam_instance_profile.existing_profile.name
   key_name                = local.key_to_use
 
@@ -129,11 +160,11 @@ output "vpc_id" {
 }
 
 output "subnet_id" {
-  value = aws_subnet.public_subnet.id
+  value = data.aws_subnet.used_subnet.id
 }
 
 output "security_group_id" {
-  value = aws_security_group.app_sg.id
+  value = data.aws_security_group.used_sg.id
 }
 
 output "iam_role_arn" {
