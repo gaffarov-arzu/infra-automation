@@ -1,67 +1,60 @@
-##############################
-# PROVIDER
-##############################
 provider "aws" {
   region = "us-west-2"
 }
 
-##############################
-# EXISTING VPC
-##############################
-data "aws_vpcs" "existing" {}
-
-locals {
-  existing_vpc = length(data.aws_vpcs.existing.ids) > 0 ? data.aws_vpcs.existing.ids[0] : null
+# VPC
+resource "aws_vpc" "main_vpc" {
+  cidr_block = "10.0.0.0/16"
+  tags = { Name = "dev-vpc" }
 }
 
-data "aws_vpc" "used_vpc" {
-  id = local.existing_vpc
+# Subnet
+resource "aws_subnet" "public_subnet" {
+  vpc_id     = aws_vpc.main_vpc.id
+  cidr_block = "10.0.1.0/24"
+  map_public_ip_on_launch = true
+  tags = { Name = "dev-public-subnet" }
 }
 
-##############################
-# EXISTING SUBNET
-##############################
-data "aws_subnets" "existing_subnets" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.used_vpc.id]
+# Security Group
+resource "aws_security_group" "dev_sg" {
+  name   = "dev-sg"
+  vpc_id = aws_vpc.main_vpc.id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
-# Sadece ilk subneti kullan
-data "aws_subnet" "used_subnet" {
-  id = data.aws_subnets.existing_subnets.ids[0]
+# Key Pair (opsiyonel, eğer Terraform ile yaratmak istiyorsan)
+resource "aws_key_pair" "my_key" {
+  key_name   = "my-key"
+  public_key = file("~/.ssh/id_rsa.pub") # kendi public key’in
 }
 
-##############################
-# EXISTING SECURITY GROUP
-##############################
-data "aws_security_group" "used_sg" {
-  filter {
-    name   = "group-name"
-    values = ["dev-sg"]
-  }
+# EC2 Instance
+resource "aws_instance" "app_instance" {
+  ami                         = data.aws_ami.amazon_linux.id
+  instance_type                = "t2.micro"
+  subnet_id                    = aws_subnet.public_subnet.id
+  vpc_security_group_ids       = [aws_security_group.dev_sg.id]
+  key_name                     = aws_key_pair.my_key.key_name
+  associate_public_ip_address  = true
 
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.used_vpc.id]
-  }
+  tags = { Name = "dev-instance" }
 }
 
-##############################
-# EXISTING KEY PAIR
-##############################
-data "aws_key_pair" "existing_key" {
-  key_name = "my-key"
-}
-
-locals {
-  key_to_use = data.aws_key_pair.existing_key.key_name
-}
-
-##############################
-# EC2 INSTANCE
-##############################
+# Amazon Linux AMI (data)
 data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
@@ -72,40 +65,10 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-resource "aws_instance" "app_instance" {
-  ami                    = data.aws_ami.amazon_linux.id
-  instance_type           = "t2.micro"
-  subnet_id               = data.aws_subnet.used_subnet.id
-  vpc_security_group_ids  = [data.aws_security_group.used_sg.id]
-  key_name                = local.key_to_use
-  associate_public_ip_address = true
-
-  tags = { Name = "dev-instance" }
-}
-
-##############################
-# OUTPUTS
-##############################
-output "vpc_id" {
-  value = data.aws_vpc.used_vpc.id
-}
-
-output "subnet_id" {
-  value = data.aws_subnet.used_subnet.id
-}
-
-output "security_group_id" {
-  value = data.aws_security_group.used_sg.id
-}
-
-output "instance_id" {
-  value = aws_instance.app_instance.id
-}
-
-output "public_ip" {
-  value = aws_instance.app_instance.public_ip
-}
-
-output "key_name" {
-  value = local.key_to_use
-}
+# Outputs
+output "vpc_id" { value = aws_vpc.main_vpc.id }
+output "subnet_id" { value = aws_subnet.public_subnet.id }
+output "security_group_id" { value = aws_security_group.dev_sg.id }
+output "instance_id" { value = aws_instance.app_instance.id }
+output "public_ip" { value = aws_instance.app_instance.public_ip }
+output "key_name" { value = aws_key_pair.my_key.key_name }
