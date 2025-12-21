@@ -6,15 +6,29 @@ provider "aws" {
 }
 
 ##############################
-# VPC & NETWORK
+# VPC (varsa kullan / yoksa oluştur)
 ##############################
+data "aws_vpcs" "existing" {}
+
+locals {
+  existing_vpc = length(data.aws_vpcs.existing.ids) > 0 ? data.aws_vpcs.existing.ids[0] : null
+}
+
 resource "aws_vpc" "main_vpc" {
+  count      = local.existing_vpc == null ? 1 : 0
   cidr_block = "10.0.0.0/16"
   tags = { Name = "dev-vpc" }
 }
 
+data "aws_vpc" "used_vpc" {
+  id = local.existing_vpc != null ? local.existing_vpc : aws_vpc.main_vpc[0].id
+}
+
+##############################
+# SUBNET
+##############################
 resource "aws_subnet" "public_subnet" {
-  vpc_id                  = aws_vpc.main_vpc.id
+  vpc_id                  = data.aws_vpc.used_vpc.id
   cidr_block              = "10.0.1.0/24"
   map_public_ip_on_launch = true
   availability_zone       = "us-west-2a"
@@ -27,7 +41,7 @@ resource "aws_subnet" "public_subnet" {
 resource "aws_security_group" "app_sg" {
   name        = "dev-sg"
   description = "Allow SSH and HTTP"
-  vpc_id      = aws_vpc.main_vpc.id
+  vpc_id      = data.aws_vpc.used_vpc.id
 
   ingress {
     from_port   = 22
@@ -66,11 +80,21 @@ data "aws_iam_instance_profile" "existing_profile" {
 }
 
 ##############################
-# SSH KEY PAIR (CI/CD uyumlu)
+# SSH KEY PAIR (varsa kullan / yoksa oluştur)
 ##############################
+data "aws_key_pair" "existing_key" {
+  key_name = "my-key"
+  # Eğer yoksa bu data hata verir, aşağıdaki create ile telafi edilecek
+}
+
 resource "aws_key_pair" "my_key" {
+  count      = can(data.aws_key_pair.existing_key.key_name) ? 0 : 1
   key_name   = "my-key"
   public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDHk/zcBgXqANXR4hQux6FaCnS1nEdcr73ZTVFPpOBLRp+XzaK9mQJBCWfhKOVS+q84tH16YGwv5hzoIlPGwK9DcYteeeKF9tRLj3OwUEiEF1kOUZS397BtG3WzGCjgVtER5/+V7FjPi3TZ+d7DHOSL8nGAIjMfp2lhjcse7lCH36uvtl/q7ZRu1TUOlWC7WK11TEu95pvwYx/6HGVNbax1ZfMR5//pg5+CfMhKLrDABTAbv/3n63gLI6V3ssU3CqI3NUJWl973LiEoVJt59InFaAiqkZzZ//4Z/go+KY59eaKjAnmyId54kyeUYrCT+6b48AILjmMW3JSQyna9OY8dC9RFzq/tBE0Rzvh2frYtLpaAg/ErxfhuCPgoT3BeE0tK9vVywc+b6nhN9fd8JCQBHmmNeXm9hHwWnn4qbsOrkI9Rhx/Z5mbB9Wf7uk7D9dbGTwQVG94pPLksd1CDUWGca7TlHoMzO5rS2cqQkRwDWzOL4ngaSNbaM+gXPMqlnO0WEd80RZUeg6ykvcDTZCXSOBZWoFjrJZikn0XJi6aCH4c5ij42MlMa0HUG52oZ6fSAigSfdTo1Y84VZxRDC9prfzc95chh5MxJWB8OjWq2QrnNR/rLDMewMLNOTVmYFfXFkx8gCFUpaj1INWcKRRIlBwKghNQXh962ckISBoaRlw== your_email@example.com"
+}
+
+locals {
+  key_to_use = can(data.aws_key_pair.existing_key.key_name) ? data.aws_key_pair.existing_key.key_name : aws_key_pair.my_key[0].key_name
 }
 
 ##############################
@@ -92,7 +116,7 @@ resource "aws_instance" "app_instance" {
   subnet_id               = aws_subnet.public_subnet.id
   vpc_security_group_ids  = [aws_security_group.app_sg.id]
   iam_instance_profile    = data.aws_iam_instance_profile.existing_profile.name
-  key_name                = aws_key_pair.my_key.key_name
+  key_name                = local.key_to_use
 
   tags = { Name = "dev-instance" }
 }
@@ -101,7 +125,7 @@ resource "aws_instance" "app_instance" {
 # OUTPUTS
 ##############################
 output "vpc_id" {
-  value = aws_vpc.main_vpc.id
+  value = data.aws_vpc.used_vpc.id
 }
 
 output "subnet_id" {
@@ -121,5 +145,5 @@ output "instance_id" {
 }
 
 output "key_name" {
-  value = aws_key_pair.my_key.key_name
+  value = local.key_to_use
 }
