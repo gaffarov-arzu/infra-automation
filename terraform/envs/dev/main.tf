@@ -1,16 +1,4 @@
 ##############################
-# BACKEND (S3 ile state)
-##############################
-terraform {
-  backend "s3" {
-    bucket = "arzu-terraform-state-20251221"  # Benzersiz bucket ismi
-    key    = "dev/terraform.tfstate"
-    region = "us-west-2"
-    encrypt = true
-  }
-}
-
-##############################
 # PROVIDER
 ##############################
 provider "aws" {
@@ -22,11 +10,21 @@ provider "aws" {
 ##############################
 resource "aws_vpc" "main_vpc" {
   cidr_block = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
   tags = { Name = "dev-vpc" }
 }
 
 ##############################
-# SUBNET
+# INTERNET GATEWAY
+##############################
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.main_vpc.id
+  tags   = { Name = "dev-igw" }
+}
+
+##############################
+# PUBLIC SUBNET
 ##############################
 resource "aws_subnet" "public_subnet" {
   vpc_id                  = aws_vpc.main_vpc.id
@@ -37,16 +35,44 @@ resource "aws_subnet" "public_subnet" {
 }
 
 ##############################
+# ROUTE TABLE
+##############################
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main_vpc.id
+  tags   = { Name = "dev-public-rt" }
+}
+
+resource "aws_route" "default_internet" {
+  route_table_id         = aws_route_table.public.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.igw.id
+}
+
+resource "aws_route_table_association" "public_subnet_assoc" {
+  subnet_id      = aws_subnet.public_subnet.id
+  route_table_id = aws_route_table.public.id
+}
+
+##############################
 # SECURITY GROUP
 ##############################
 resource "aws_security_group" "dev_sg" {
   name        = "dev-sg"
-  description = "Dev security group"
+  description = "Allow SSH and HTTP"
   vpc_id      = aws_vpc.main_vpc.id
 
   ingress {
+    description = "SSH"
     from_port   = 22
     to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -62,10 +88,11 @@ resource "aws_security_group" "dev_sg" {
 }
 
 ##############################
-# EXISTING SSH KEY PAIR
+# KEY PAIR
 ##############################
-data "aws_key_pair" "existing_key" {
-  key_name = "my-key"  # AWS’de zaten var olan key adı
+resource "aws_key_pair" "my_key" {
+  key_name   = "my-key"
+  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDHk/... your_public_key_here ..."
 }
 
 ##############################
@@ -86,7 +113,7 @@ resource "aws_instance" "app_instance" {
   instance_type           = "t2.micro"
   subnet_id               = aws_subnet.public_subnet.id
   vpc_security_group_ids  = [aws_security_group.dev_sg.id]
-  key_name                = data.aws_key_pair.existing_key.key_name
+  key_name                = aws_key_pair.my_key.key_name
 
   tags = { Name = "dev-instance" }
 }
@@ -110,6 +137,10 @@ output "instance_id" {
   value = aws_instance.app_instance.id
 }
 
+output "public_ip" {
+  value = aws_instance.app_instance.public_ip
+}
+
 output "key_name" {
-  value = data.aws_key_pair.existing_key.key_name
+  value = aws_key_pair.my_key.key_name
 }
