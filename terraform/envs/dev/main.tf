@@ -55,11 +55,13 @@ resource "aws_security_group" "app_sg" {
 # EXISTING IAM ROLE
 ##############################
 data "aws_iam_role" "existing_dev_role" {
-  name = "dev-role"  # AWS'de zaten var olan rolün adı
+  name = "dev-role"  # AWS'de zaten var olan rol
 }
 
-data "aws_iam_instance_profile" "existing_profile" {
-  name = "dev-role"  # Bu rolün bağlı olduğu instance profile adı
+# Eğer rolün instance profile yoksa Terraform ile yaratıyoruz
+resource "aws_iam_instance_profile" "dev_role_profile" {
+  name = "dev-role-profile"
+  role = data.aws_iam_role.existing_dev_role.name
 }
 
 ##############################
@@ -81,7 +83,7 @@ resource "aws_instance" "app_instance" {
   instance_type           = "t2.micro"
   subnet_id               = aws_subnet.public_subnet.id
   vpc_security_group_ids  = [aws_security_group.app_sg.id]
-  iam_instance_profile    = data.aws_iam_instance_profile.existing_profile.name
+  iam_instance_profile    = aws_iam_instance_profile.dev_role_profile.name
   key_name                = "my-key"  # kendi keypair
 
   tags = { Name = "dev-instance" }
