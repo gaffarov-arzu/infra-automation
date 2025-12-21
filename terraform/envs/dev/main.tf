@@ -3,7 +3,7 @@
 ##############################
 terraform {
   backend "s3" {
-    bucket = "arzu-terraform-state-20251221"
+    bucket = "arzu-terraform-state-20251221"  # Benzersiz bucket ismi
     key    = "dev/terraform.tfstate"
     region = "us-west-2"
     encrypt = true
