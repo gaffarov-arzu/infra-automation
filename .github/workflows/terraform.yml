@@ -2,36 +2,23 @@ name: Terraform Dev Apply
 
 on:
   push:
-    branches:
-      - main  # main branch push’unda tetiklenecek
+    paths:
+      - 'terraform/**'
 
 jobs:
   terraform:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+      - uses: actions/checkout@v3
+      - uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.7.0
-
       - name: Terraform Init
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-west-2
         run: terraform -chdir=terraform/envs/dev init
-
-      - name: Terraform Plan
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-west-2
-        run: terraform -chdir=terraform/envs/dev plan
-
       - name: Terraform Apply
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
