@@ -64,11 +64,11 @@ resource "aws_iam_instance_profile" "dev_role_profile" {
 }
 
 ##############################
-# SSH KEY PAIR
+# SSH KEY PAIR (CI/CD uyumlu)
 ##############################
 resource "aws_key_pair" "my_key" {
   key_name   = "my-key"
-  public_key = file("~/.ssh/id_rsa.pub")  # kendi public key dosyan
+  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDHk/zcBgXqANXR4hQux6FaCnS1nEdcr73ZTVFPpOBLRp+XzaK9mQJBCWfhKOVS+q84tH16YGwv5hzoIlPGwK9DcYteeeKF9tRLj3OwUEiEF1kOUZS397BtG3WzGCjgVtER5/+V7FjPi3TZ+d7DHOSL8nGAIjMfp2lhjcse7lCH36uvtl/q7ZRu1TUOlWC7WK11TEu95pvwYx/6HGVNbax1ZfMR5//pg5+CfMhKLrDABTAbv/3n63gLI6V3ssU3CqI3NUJWl973LiEoVJt59InFaAiqkZzZ//4Z/go+KY59eaKjAnmyId54kyeUYrCT+6b48AILjmMW3JSQyna9OY8dC9RFzq/tBE0Rzvh2frYtLpaAg/ErxfhuCPgoT3BeE0tK9vVywc+b6nhN9fd8JCQBHmmNeXm9hHwWnn4qbsOrkI9Rhx/Z5mbB9Wf7uk7D9dbGTwQVG94pPLksd1CDUWGca7TlHoMzO5rS2cqQkRwDWzOL4ngaSNbaM+gXPMqlnO0WEd80RZUeg6ykvcDTZCXSOBZWoFjrJZikn0XJi6aCH4c5ij42MlMa0HUG52oZ6fSAigSfdTo1Y84VZxRDC9prfzc95chh5MxJWB8OjWq2QrnNR/rLDMewMLNOTVmYFfXFkx8gCFUpaj1INWcKRRIlBwKghNQXh962ckISBoaRlw== your_email@example.com"
 }
 
 ##############################
