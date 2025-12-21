@@ -62,11 +62,10 @@ resource "aws_security_group" "dev_sg" {
 }
 
 ##############################
-# SSH KEY PAIR
+# EXISTING SSH KEY PAIR
 ##############################
-resource "aws_key_pair" "my_key" {
-  key_name   = "my-key"
-  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDHk/... your_email@example.com"
+data "aws_key_pair" "existing_key" {
+  key_name = "my-key"  # AWS’de zaten var olan key adı
 }
 
 ##############################
@@ -87,7 +86,7 @@ resource "aws_instance" "app_instance" {
   instance_type           = "t2.micro"
   subnet_id               = aws_subnet.public_subnet.id
   vpc_security_group_ids  = [aws_security_group.dev_sg.id]
-  key_name                = aws_key_pair.my_key.key_name
+  key_name                = data.aws_key_pair.existing_key.key_name
 
   tags = { Name = "dev-instance" }
 }
@@ -112,5 +111,5 @@ output "instance_id" {
 }
 
 output "key_name" {
-  value = aws_key_pair.my_key.key_name
+  value = data.aws_key_pair.existing_key.key_name
 }
