@@ -9,7 +9,7 @@ provider "aws" {
 # VPC
 ##############################
 resource "aws_vpc" "main_vpc" {
-  cidr_block = "10.0.0.0/16"
+  cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true
   enable_dns_hostnames = true
   tags = { Name = "dev-vpc" }
@@ -88,11 +88,14 @@ resource "aws_security_group" "dev_sg" {
 }
 
 ##############################
-# KEY PAIR
+# EXISTING KEY PAIR
 ##############################
-resource "aws_key_pair" "my_key" {
-  key_name   = "my-key"
-  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDHk/... your_public_key_here ..."
+data "aws_key_pair" "existing_key" {
+  key_name = "my-key"
+}
+
+locals {
+  key_to_use = data.aws_key_pair.existing_key.key_name
 }
 
 ##############################
@@ -113,7 +116,7 @@ resource "aws_instance" "app_instance" {
   instance_type           = "t2.micro"
   subnet_id               = aws_subnet.public_subnet.id
   vpc_security_group_ids  = [aws_security_group.dev_sg.id]
-  key_name                = aws_key_pair.my_key.key_name
+  key_name                = local.key_to_use
 
   tags = { Name = "dev-instance" }
 }
@@ -142,5 +145,5 @@ output "public_ip" {
 }
 
 output "key_name" {
-  value = aws_key_pair.my_key.key_name
+  value = local.key_to_use
 }
